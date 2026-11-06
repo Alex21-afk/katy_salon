@@ -61,6 +61,23 @@ final class PublicController
         send_file($path, $mime, (int) $image['activo'] ? 'public, no-cache' : 'private, no-store');
     }
 
+    public function serviceImage(): never
+    {
+        $filename = basename((string) ($_GET['file'] ?? ''));
+        $service = preg_match('/^[a-f0-9]{40}\.(jpg|png|webp)$/', $filename) ? $this->model->serviceByPhoto($filename, !empty($_SESSION['admin_id'])) : null;
+        $path = $this->config['upload_dir'] . '/' . $filename;
+        if (!$service || !is_file($path)) {
+            http_response_code(404);
+            exit;
+        }
+        $mime = (new finfo(FILEINFO_MIME_TYPE))->file($path);
+        if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) {
+            http_response_code(415);
+            exit;
+        }
+        send_file($path, $mime, (int) $service['activo'] ? 'public, no-cache' : 'private, no-store');
+    }
+
     public function videoFile(): never
     {
         $filename = basename((string) ($_GET['file'] ?? ''));
@@ -74,13 +91,19 @@ final class PublicController
         send_file($path, $mime, (int) $video['activo'] ? 'public, no-cache' : 'private, no-store');
     }
 
-    /** Logo o icono subidos desde el panel; si no hay, el logo original del proyecto. */
+    /** Logo, icono o foto del banner subidos desde el panel; si no hay, la imagen original del proyecto. */
     public function brandAsset(string $kind): never
     {
-        $filename = (string) ($this->model->settings()[$kind === 'icono' ? 'icono_archivo' : 'logo_archivo'] ?? '');
+        [$setting, $original] = [
+            'logo' => ['logo_archivo', 'logo.jpg'],
+            'icono' => ['icono_archivo', 'logo.jpg'],
+            'hero-principal' => ['hero_principal_archivo', 'hero-principal.jpg'],
+            'hero-secundaria' => ['hero_secundaria_archivo', 'hero-secundaria.jpg'],
+        ][$kind];
+        $filename = (string) ($this->model->settings()[$setting] ?? '');
         $path = $this->config['upload_dir'] . '/' . $filename;
         if (!preg_match('/^[a-f0-9]{40}\.(jpg|png|webp)$/', $filename) || !is_file($path)) {
-            $path = APP_ROOT . '/public/assets/img/logo.jpg';
+            $path = APP_ROOT . '/public/assets/img/' . $original;
         }
         $mime = (new finfo(FILEINFO_MIME_TYPE))->file($path);
         if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) {

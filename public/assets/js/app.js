@@ -110,7 +110,8 @@
     } catch (error) {
       bookingFeedback.textContent = error.message;
       button.disabled = false;
-      button.innerHTML = 'Solicitar cita <i class="bi bi-arrow-right"></i>';
+      button.textContent = `${button.dataset.label} `;
+      button.insertAdjacentHTML('beforeend', '<i class="bi bi-arrow-right"></i>');
     }
   });
 
@@ -122,12 +123,17 @@
   const setEnrollMode = (waitlist) => {
     waitlistFlag.value = waitlist ? '1' : '0';
     voucherField.hidden = waitlist;
-    document.querySelector('#enrollSubmit').textContent = waitlist ? 'Unirme a la lista' : 'Enviar solicitud';
+    const submit = document.querySelector('#enrollSubmit');
+    submit.textContent = waitlist ? submit.dataset.waitlistLabel : submit.dataset.label;
   };
   document.querySelectorAll('.js-course-enroll').forEach((button) => button.addEventListener('click', () => {
     enrollCourse.value = button.dataset.course;
     setEnrollMode(button.dataset.waitlist === '1');
-    document.querySelector('#inscripcion').scrollIntoView({ behavior: 'smooth' });
+    const scrollToForm = () => document.querySelector('#inscripcion').scrollIntoView({ behavior: 'smooth' });
+    // Dentro de la ventana de información hay que esperar a que se cierre: mientras está abierta la página no se desplaza.
+    const modal = button.closest('.modal');
+    if (modal) modal.addEventListener('hidden.bs.modal', scrollToForm, { once: true });
+    else scrollToForm();
   }));
   enrollCourse?.addEventListener('change', () => {
     setEnrollMode(enrollCourse.selectedOptions[0]?.dataset.full === '1');

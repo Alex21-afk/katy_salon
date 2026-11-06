@@ -603,12 +603,28 @@ final class SalonModel
     public function saveService(array $data): void
     {
         if ((int) $data['id'] > 0) {
-            $stmt = $this->db->prepare('UPDATE servicios SET categoria_id = ?, nombre = ?, descripcion = ?, precio = ?, duracion_minutos = ?, activo = ?, orden = ? WHERE id = ?');
-            $stmt->execute([$data['category_id'] ?: null, $data['name'], $data['description'], $data['price'], $data['duration'], $data['active'], $data['order'], $data['id']]);
+            $stmt = $this->db->prepare('UPDATE servicios SET categoria_id = ?, nombre = ?, descripcion = ?, precio = ?, duracion_minutos = ?, foto = ?, activo = ?, orden = ? WHERE id = ?');
+            $stmt->execute([$data['category_id'] ?: null, $data['name'], $data['description'], $data['price'], $data['duration'], $data['photo'], $data['active'], $data['order'], $data['id']]);
             return;
         }
-        $stmt = $this->db->prepare('INSERT INTO servicios (categoria_id, nombre, descripcion, precio, duracion_minutos, activo, orden) VALUES (?, ?, ?, ?, ?, ?, ?)');
-        $stmt->execute([$data['category_id'] ?: null, $data['name'], $data['description'], $data['price'], $data['duration'], $data['active'], $data['order']]);
+        $stmt = $this->db->prepare('INSERT INTO servicios (categoria_id, nombre, descripcion, precio, duracion_minutos, foto, activo, orden) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+        $stmt->execute([$data['category_id'] ?: null, $data['name'], $data['description'], $data['price'], $data['duration'], $data['photo'], $data['active'], $data['order']]);
+    }
+
+    /** Nombre del archivo de la foto actual de un servicio. */
+    public function servicePhoto(int $id): ?string
+    {
+        $stmt = $this->db->prepare('SELECT foto FROM servicios WHERE id = ?');
+        $stmt->execute([$id]);
+        return $stmt->fetchColumn() ?: null;
+    }
+
+    /** Servicio dueño de una foto; los ocultos solo se devuelven al panel. */
+    public function serviceByPhoto(string $filename, bool $includeHidden = false): ?array
+    {
+        $stmt = $this->db->prepare('SELECT id, activo FROM servicios WHERE foto = ?' . ($includeHidden ? '' : ' AND activo = 1'));
+        $stmt->execute([$filename]);
+        return $stmt->fetch() ?: null;
     }
 
     public function updateCourseSeats(int $id, int $delta): void
@@ -625,12 +641,12 @@ final class SalonModel
             if ((int) $approved->fetchColumn() > (int) $data['seats']) {
                 throw new RuntimeException('Los cupos no pueden ser menores a los aprobados.');
             }
-            $stmt = $this->db->prepare('UPDATE cursos SET nombre = ?, nivel = ?, descripcion = ?, fecha_inicio = ?, fecha_fin = ?, sesiones = ?, precio = ?, cupos_totales = ?, estado = ? WHERE id = ?');
-            $stmt->execute([$data['name'], $data['level'], $data['description'], $data['start_date'], $data['end_date'], $data['sessions'], $data['price'], $data['seats'], $data['status'], $data['id']]);
+            $stmt = $this->db->prepare('UPDATE cursos SET nombre = ?, nivel = ?, descripcion = ?, modulos = ?, incluye = ?, fecha_inicio = ?, fecha_fin = ?, sesiones = ?, horas = ?, precio = ?, cupos_totales = ?, estado = ? WHERE id = ?');
+            $stmt->execute([$data['name'], $data['level'], $data['description'], $data['modules'], $data['includes'], $data['start_date'], $data['end_date'], $data['sessions'], $data['hours'], $data['price'], $data['seats'], $data['status'], $data['id']]);
             return;
         }
-        $stmt = $this->db->prepare('INSERT INTO cursos (nombre, nivel, descripcion, fecha_inicio, fecha_fin, sesiones, precio, cupos_totales, estado) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
-        $stmt->execute([$data['name'], $data['level'], $data['description'], $data['start_date'], $data['end_date'], $data['sessions'], $data['price'], $data['seats'], $data['status']]);
+        $stmt = $this->db->prepare('INSERT INTO cursos (nombre, nivel, descripcion, modulos, incluye, fecha_inicio, fecha_fin, sesiones, horas, precio, cupos_totales, estado) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        $stmt->execute([$data['name'], $data['level'], $data['description'], $data['modules'], $data['includes'], $data['start_date'], $data['end_date'], $data['sessions'], $data['hours'], $data['price'], $data['seats'], $data['status']]);
     }
 
     public function categories(): array

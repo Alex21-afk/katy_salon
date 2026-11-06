@@ -20,9 +20,11 @@ if ($path === '/api/horarios' && $method === 'GET') {
     $public->availableTimes();
 } elseif ($path === '/media' && $method === 'GET') {
     $public->galleryImage();
+} elseif ($path === '/servicio-foto' && $method === 'GET') {
+    $public->serviceImage();
 } elseif ($path === '/video' && $method === 'GET') {
     $public->videoFile();
-} elseif (($path === '/marca/logo' || $path === '/marca/icono') && $method === 'GET') {
+} elseif (in_array($path, ['/marca/logo', '/marca/icono', '/marca/hero-principal', '/marca/hero-secundaria'], true) && $method === 'GET') {
     $public->brandAsset(substr($path, 7));
 } elseif ($path === '/api/reservar' && $method === 'POST') {
     $public->bookAppointment();
@@ -54,6 +56,8 @@ if ($path === '/api/horarios' && $method === 'GET') {
     $admin->deleteBlock();
 } elseif ($path === '/admin/configuracion' && $method === 'POST') {
     $admin->saveSettings();
+} elseif ($path === '/admin/textos' && $method === 'POST') {
+    $admin->saveTexts();
 } elseif ($path === '/admin/galeria' && $method === 'POST') {
     $admin->saveGalleryImage();
 } elseif ($path === '/admin/galeria-orden' && $method === 'POST') {

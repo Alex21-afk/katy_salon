@@ -210,10 +210,48 @@ function send_file(string $path, string $mime, string $cacheControl): never
     exit;
 }
 
-/** URL del logo o del icono configurados en el panel (o los originales si no hay). */
+/** URL del logo, el icono o las fotos del banner configurados en el panel (o los originales si no hay). */
 function brand_url(string $kind): string
 {
-    return app_url('marca/' . ($kind === 'icono' ? 'icono' : 'logo'));
+    return app_url('marca/' . (in_array($kind, ['icono', 'hero-principal', 'hero-secundaria'], true) ? $kind : 'logo'));
+}
+
+/** Grupos de textos editables de la web (ver app/site_texts.php). */
+function site_text_groups(): array
+{
+    static $groups = null;
+    return $groups ??= require APP_ROOT . '/app/site_texts.php';
+}
+
+/** Todos los campos de texto, sin agrupar: clave => [etiqueta, por defecto, tipo, ayuda]. */
+function site_text_fields(): array
+{
+    static $fields = null;
+    return $fields ??= array_merge(...array_values(array_column(site_text_groups(), 'fields')));
+}
+
+/** Texto guardado en Configuración o, si está vacío, el texto por defecto. */
+function site_text(array $settings, string $key): string
+{
+    $value = trim((string) ($settings[$key] ?? ''));
+    return $value !== '' ? $value : (site_text_fields()[$key][1] ?? '');
+}
+
+/** Separa un texto en líneas no vacías: cada línea es un punto de una lista. */
+function text_lines(?string $text): array
+{
+    return array_values(array_filter(array_map('trim', preg_split('/\R/u', (string) $text) ?: []), static fn(string $line): bool => $line !== ''));
+}
+
+/**
+ * Módulos de un curso, guardados como JSON.
+ *
+ * @return list<array{titulo: string, contenido: string}>
+ */
+function course_modules(?string $json): array
+{
+    $modules = json_decode((string) $json, true);
+    return is_array($modules) ? $modules : [];
 }
 
 function money(float|int|string $amount): string

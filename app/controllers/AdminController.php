@@ -8,6 +8,14 @@ final class AdminController
     private const MAX_PRICE = 9999999.99;
     private const IMAGE_TYPES = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
     private const VIDEO_TYPES = ['video/mp4' => 'mp4', 'video/webm' => 'webm'];
+    // Campo del formulario => [clave en configuracion, nombre para los mensajes, MB máximos].
+    private const BRAND_FILES = [
+        'logo' => ['logo_archivo', 'logo', 2],
+        'icono' => ['icono_archivo', 'icono', 2],
+        'hero_principal' => ['hero_principal_archivo', 'foto principal', 5],
+        'hero_secundaria' => ['hero_secundaria_archivo', 'foto secundaria', 5],
+    ];
+    public const MAX_COURSE_MODULES = 3;
     public const INCOME_METHODS = ['efectivo' => 'Efectivo', 'yape' => 'Yape', 'plin' => 'Plin', 'transferencia' => 'Transferencia', 'tarjeta' => 'Tarjeta', 'otro' => 'Otro'];
     public const INCOME_ORIGINS = ['cita' => 'Citas', 'curso' => 'Cursos', 'producto' => 'Productos', 'otro' => 'Otros'];
 
@@ -332,6 +340,7 @@ final class AdminController
     public function saveService(): never
     {
         $this->requireAdmin();
+        $this->rejectOversizedPost('servicios');
         verify_csrf();
         $data = [
             'id' => (int) ($_POST['id'] ?? 0),
@@ -350,7 +359,20 @@ final class AdminController
         } elseif ($data['category_id'] > 0 && !$this->model->categoryExists($data['category_id'])) {
             flash('error', 'La categoría elegida ya no existe.');
         } else {
+            $current = $data['id'] > 0 ? $this->model->servicePhoto($data['id']) : null;
+            $data['photo'] = isset($_POST['remove_photo']) ? null : $current;
+            if ((($_FILES['photo']['error'] ?? UPLOAD_ERR_NO_FILE)) !== UPLOAD_ERR_NO_FILE) {
+                try {
+                    $data['photo'] = store_upload($_FILES['photo'], self::IMAGE_TYPES, 5 * 1024 * 1024, $this->config['upload_dir']);
+                } catch (RuntimeException $error) {
+                    flash('error', 'Foto: ' . $error->getMessage() . ' Usa JPG, PNG o WebP de máximo 5 MB. No se guardaron los cambios.');
+                    redirect('admin?tab=servicios');
+                }
+            }
             $this->model->saveService($data);
+            if ($current !== null && $current !== $data['photo']) {
+                $this->deleteBrandFile($current);
+            }
             flash('success', 'Servicio guardado.');
         }
         redirect('admin?tab=servicios');
@@ -377,6 +399,9 @@ final class AdminController
             'start_date' => (string) ($_POST['start_date'] ?? ''),
             'end_date' => trim((string) ($_POST['end_date'] ?? '')) ?: null,
             'sessions' => filter_var($_POST['sessions'] ?? null, FILTER_VALIDATE_INT),
+            'hours' => mb_substr(trim((string) ($_POST['hours'] ?? '')), 0, 80),
+            'modules' => $this->parseCourseModules($_POST['modules'] ?? null),
+            'includes' => mb_substr(trim((string) ($_POST['includes'] ?? '')), 0, 2000),
             'price' => filter_var($_POST['price'] ?? null, FILTER_VALIDATE_FLOAT),
             'seats' => filter_var($_POST['seats'] ?? null, FILTER_VALIDATE_INT),
             'status' => (string) ($_POST['status'] ?? 'activo'),
@@ -402,6 +427,20 @@ final class AdminController
             }
         }
         redirect('admin?tab=cursos');
+    }
+
+    /** Convierte los módulos del formulario en JSON; se ignoran los que quedaron vacíos. */
+    private function parseCourseModules(mixed $rows): string
+    {
+        $modules = [];
+        foreach (array_slice(is_array($rows) ? $rows : [], 0, self::MAX_COURSE_MODULES) as $row) {
+            $title = mb_substr(trim((string) ($row['title'] ?? '')), 0, 120);
+            $content = mb_substr(trim((string) ($row['content'] ?? '')), 0, 3000);
+            if ($title !== '' || $content !== '') {
+                $modules[] = ['titulo' => $title, 'contenido' => $content];
+            }
+        }
+        return (string) json_encode($modules, JSON_UNESCAPED_UNICODE);
     }
 
     private function parseDateTimeLocal(string $value): ?DateTimeImmutable
@@ -464,15 +503,31 @@ final class AdminController
             }
         }
         $this->model->saveOpeningHours($hours);
-        $settings = [
-            'whatsapp' => $whatsapp ?: $this->config['whatsapp'],
-            'direccion' => mb_substr(trim((string) ($_POST['direccion'] ?? '')), 0, 250),
-            'horario_texto' => mb_substr(trim((string) ($_POST['horario_texto'] ?? '')), 0, 250),
-            'hero_titulo' => mb_substr(trim((string) ($_POST['hero_titulo'] ?? '')), 0, 160),
-            'hero_subtitulo' => mb_substr(trim((string) ($_POST['hero_subtitulo'] ?? '')), 0, 300),
-        ];
-        $this->model->saveSettings($settings);
+        $this->model->saveSettings(['whatsapp' => $whatsapp ?: $this->config['whatsapp']]);
         flash('success', 'Configuración guardada.');
+        redirect('admin?tab=configuracion');
+    }
+
+    /** Guarda los textos de la web. Un campo vacío vuelve al texto por defecto. */
+    public function saveTexts(): never
+    {
+        $this->requireAdmin();
+        verify_csrf();
+        $sent = is_array($_POST['txt'] ?? null) ? $_POST['txt'] : [];
+        $settings = [];
+        foreach (site_text_fields() as $key => $field) {
+            if (!isset($sent[$key]) || !is_string($sent[$key])) {
+                continue;
+            }
+            $value = trim(str_replace("\r\n", "\n", $sent[$key]));
+            if ($field[2] === 'url' && $value !== '' && (!preg_match('#^https?://#i', $value) || !filter_var($value, FILTER_VALIDATE_URL))) {
+                flash('error', 'Revisa "' . $field[0] . '": debe ser un enlace completo que empiece con https://. No se guardaron los cambios.');
+                redirect('admin?tab=configuracion');
+            }
+            $settings[$key] = mb_substr($value, 0, $field[2] === 'long' ? 3000 : 300);
+        }
+        $this->model->saveSettings($settings);
+        flash('success', 'Textos guardados. Ya se ven en la página.');
         redirect('admin?tab=configuracion');
     }
 
@@ -551,38 +606,37 @@ final class AdminController
         redirect('admin?tab=videos');
     }
 
-    /** Sube o restaura el logo y el icono (favicon) del sitio. */
+    /** Sube o restaura el logo, el icono (favicon) y las fotos del banner principal. */
     public function saveBrand(): never
     {
         $this->requireAdmin();
         $this->rejectOversizedPost('configuracion');
         verify_csrf();
         $settings = $this->model->settings();
-        $kinds = ['logo' => 'logo_archivo', 'icono' => 'icono_archivo'];
         $action = (string) ($_POST['action'] ?? 'upload');
-        if (str_starts_with($action, 'reset_') && isset($kinds[substr($action, 6)])) {
-            $key = $kinds[substr($action, 6)];
+        if (str_starts_with($action, 'reset_') && isset(self::BRAND_FILES[substr($action, 6)])) {
+            [$key, $label] = self::BRAND_FILES[substr($action, 6)];
             $this->deleteBrandFile($settings[$key] ?? '');
             $this->model->saveSettings([$key => '']);
-            flash('success', substr($action, 6) === 'logo' ? 'Se restauró el logo original.' : 'Se restauró el icono original.');
+            flash('success', 'Se restauró: ' . $label . ' original.');
             redirect('admin?tab=configuracion');
         }
         $saved = [];
-        foreach ($kinds as $field => $key) {
+        foreach (self::BRAND_FILES as $field => [$key, $label, $maxMb]) {
             if ((($_FILES[$field]['error'] ?? UPLOAD_ERR_NO_FILE)) === UPLOAD_ERR_NO_FILE) {
                 continue;
             }
             try {
-                $filename = store_upload($_FILES[$field], self::IMAGE_TYPES, 2 * 1024 * 1024, $this->config['upload_dir']);
+                $filename = store_upload($_FILES[$field], self::IMAGE_TYPES, $maxMb * 1024 * 1024, $this->config['upload_dir']);
             } catch (RuntimeException $error) {
-                flash('error', ($field === 'logo' ? 'Logo: ' : 'Icono: ') . $error->getMessage() . ' Usa JPG, PNG o WebP de máximo 2 MB.');
+                flash('error', ucfirst($label) . ': ' . $error->getMessage() . ' Usa JPG, PNG o WebP de máximo ' . $maxMb . ' MB.');
                 redirect('admin?tab=configuracion');
             }
             $this->deleteBrandFile($settings[$key] ?? '');
             $this->model->saveSettings([$key => $filename]);
-            $saved[] = $field;
+            $saved[] = $label;
         }
-        flash($saved ? 'success' : 'error', $saved ? 'Listo: se actualizó ' . implode(' y ', $saved) . '. Si no ves el cambio, recarga la página.' : 'Elige una imagen para el logo o el icono.');
+        flash($saved ? 'success' : 'error', $saved ? 'Listo: se actualizó ' . implode(' y ', $saved) . '. Si no ves el cambio, recarga la página.' : 'Elige al menos una imagen.');
         redirect('admin?tab=configuracion');
     }
 

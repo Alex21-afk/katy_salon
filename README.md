@@ -54,7 +54,9 @@ Los vouchers e imágenes se guardan en `app/storage/uploads`, bloqueada por Apac
 - En `config.php`, reemplaza `51999999999` por el WhatsApp del estudio, con código de país y solo dígitos.
 - En el panel, abre el engranaje para actualizar dirección, horarios de atención, texto principal y WhatsApp.
 - Edita precios, duración y visibilidad desde **Servicios**; administra fotos desde **Servicios → Administrar galería**.
-- Los textos de dirección iniciales son de ejemplo. Las fotos del banner principal están en `public/assets/img/hero-principal.jpg` y `hero-secundaria.jpg`; reemplázalas con el mismo nombre para cambiarlas. Las 4 fotos de ejemplo de la galería (Unsplash) solo se muestran mientras no haya fotos subidas desde el panel.
+- Todos los textos de la portada se editan en **Configuración → Textos de la web**; si dejas un campo vacío vuelve al texto original. El catálogo de campos está en `app/site_texts.php`.
+- Las fotos del banner se cambian en **Configuración → Fotos del banner principal**. Las de `public/assets/img/` solo se usan mientras no subas otras. Las 4 fotos de ejemplo de la galería (Unsplash) solo se muestran mientras no haya fotos subidas desde el panel.
+- En **Cursos**, cada curso tiene horas, hasta 3 módulos y la lista "incluye". El proceso de inscripción, los datos de pago y el aviso importante son comunes a todos los cursos y se editan en **Textos de la web → Información común de los cursos**.
 
 ## Funciones disponibles
 
@@ -78,6 +80,8 @@ Sube el proyecto a una carpeta privada y apunta el document root a `public/` cua
 Si el sitio ya estaba funcionando con una versión anterior, no vuelvas a importar `database.sql`. En phpMyAdmin selecciona la base del sitio, abre **Importar** y carga `db/actualizacion_videos_ingresos.sql`. Solo crea las tablas `videos` e `ingresos`; no modifica ni borra datos y puede ejecutarse más de una vez.
 
 Después importa `db/actualizacion_ingresos_cursos.sql` (una sola vez): agrega a `ingresos` la columna que vincula cada adelanto con su inscripción. Si lo ejecutas dos veces verás "Duplicate column name", que es inofensivo.
+
+Por último importa `db/actualizacion_cursos_textos.sql` (una sola vez): agrega a `cursos` las columnas de horas, módulos e "incluye". Si lo ejecutas dos veces verás "Duplicate column name", que es inofensivo.
 
 El tamaño máximo de los videos es el menor entre `max_video_mb` (en `config.php`, 50 por defecto) y los límites `upload_max_filesize` / `post_max_size` de PHP del hosting. El panel muestra el límite real al subir un video.
 
