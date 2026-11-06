@@ -1,0 +1,13 @@
+{
+  "name": "Isabella Lashes & Studio",
+  "short_name": "Isabella Studio",
+  "lang": "es-PE",
+  "start_url": "./admin",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fff6fa",
+  "theme_color": "#de3580",
+  "icons": [
+    { "src": "./assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
